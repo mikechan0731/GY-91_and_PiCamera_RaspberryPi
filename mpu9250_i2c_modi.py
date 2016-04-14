@@ -1,6 +1,5 @@
 import smbus
 import time,timeit
-#import RPi.GPIO as GPIO
 
 # Global varible
 i2c = smbus.SMBus(1)
@@ -17,6 +16,7 @@ except:
 	print "Connect failed"
 
 
+# enable MPU9250 I2C SMBus measuring mode.
 i2c.write_byte_data(0x68, 0x6a, 0x00)
 i2c.write_byte_data(0x68, 0x37, 0x02)
 i2c.write_byte_data(0x0c, 0x0a, 0x16)
@@ -25,14 +25,10 @@ i2c.write_byte_data(0x0c, 0x0a, 0x16)
 # Open File
 f = open("IMU_LOG_9axis.txt", "w")
 
-
-
-
 count = 1
 
 while True:
 	if count <= 500:
-
 
 			
 		i2c.write_byte_data(0x0c, 0x0a, 0x16)
@@ -56,10 +52,10 @@ while True:
 		print >> f, xyz_mag
 
 		count += 1
+		
 	else:
 		f.close()
 		i2c.write_byte_data(addr, 0x6A, 0x07)
 		break
-
 
 print "Process End"
