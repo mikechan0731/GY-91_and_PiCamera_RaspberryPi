@@ -18,9 +18,10 @@ try:
 	device_id = i2c.read_byte_data(addr,0x75)
 	print "Device ID:" + str(hex(device_id))
 	print "MPU9250 I2C Connected."
+	print ""
 except:
 	print "Connect failed"
-
+	print ""
 i2c.write_byte_data(0x68, 0x6a, 0x00)
 i2c.write_byte_data(0x68, 0x37, 0x02)
 i2c.write_byte_data(0x0c, 0x0a, 0x16)
@@ -30,18 +31,21 @@ i2c.write_byte_data(0x0c, 0x0a, 0x16)
 
 while 1:
 	fn = input("Enter file name(do not include .txt): ")
-	check_data_format = input("Write File as bin? Y/N ")
 
 	if fn <= 1:
 		fn = "IMU_LOG.txt"
 	else:
 		fn = fn + ".txt"
+	print "File name is " + fn
 
+	check_data_format = input("Write File as bin? Y/N ")
 	if check_data_format == "Y" or check_data_format == "Yes" or check_data_format == "y":
 		format_ck = "wb"
+		print "Data format is Bin."
 
-	elif check_data_format == "N" or check_data_format == "No" or check_data_format == "n":
+	elif len(check_data_format) < 1 or check_data_format == "N" or check_data_format == "No" or check_data_format == "n":
 		format_ck = "w"
+		print "Data format is String."
 	else:
 		print "You Enter invalid input, ctl + c and try again"
 		continue
@@ -61,7 +65,6 @@ def mpu9250_data_get_and_write():
 	i2c.write_byte_data(0x0c, 0x0a, 0x16)
 
 
-	t1 = time.time() - t0
 	# get MPU9250 smbus block data
 	#xyz_g_offset = i2c.read_i2c_block_data(addr, 0x13, 6)
 	xyz_a_out = i2c.read_i2c_block_data(addr, 0x3B, 6)
@@ -73,11 +76,10 @@ def mpu9250_data_get_and_write():
 	xyz_mag_adj = i2c.read_i2c_block_data(0x0c, 0x10, 3)
 
 	# get real time
-	t2 = time.time() -t0
+	t1 = time.time() - t0
 
 	# save file to list buffer
 	t_a_g.append(t1)
-	t_a_g.append(t2)
 	t_a_g.append(xyz_a_out)
 	t_a_g.append(xyz_g_out)
 	t_a_g.append(xyz_mag)
@@ -120,9 +122,17 @@ def clear_i2c_and_close_file():
 
 # solution 1: while true
 def while_true_method():
+	max_count = raw_input("Enter how many count you want.")
+	if len(max_count) < 1: max_count = 1000
+	print "Data Counts: " + str(max_count)
+
+	max_count = int(max_count)
 	count = 1
+
+	print ""
+	print "MPU9250 9axis DATA Recording..."
 	while True:
-		if count <= 10000:
+		if count <= max_count:
 			mpu9250_data_get_and_write()
 			count += 1
 			#time.sleep(0.01)
@@ -130,7 +140,7 @@ def while_true_method():
 			if format_ck == "wb":
 				tag_to_f_bin(t_a_g)
 			elif format_ck == "w"
-				tag_to_f
+				tag_to_f()
 
 			print "write to file finished"
 			clear_i2c_and_close_file()
