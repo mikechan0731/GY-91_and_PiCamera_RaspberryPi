@@ -4,20 +4,30 @@
 # Email  : m7807031@gmail.com
 # Date   : 06/14/2016
 
-import smbus, picamera
+
 import time, sys, os, datetime, threading
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
+
+#===== Global Varibles =====
+now = datetime.datetime.now()
+today = str( str(now).split(" ")[0].split("-")[0] + str(now).split(" ")[0].split("-")[1] + str(now).split(" ")[0].split("-")[2] )
+tonow = str( str(now).split(" ")[1].split(":")[0] + str(now).split(" ")[1].split(":")[1] )
+
 
 
 #===== for raspberry PI =====
 import smbus
 import picamera
 i2c = smbus.SMBus(1)
-camera = picamera.PiCamera()
+
+#enable pi-camera
+try:
+    camera = picamera.PiCamera()
+except:
+    self.camBrowser.append("PiCamera Initial Failed")
 addr = 0x68
 raw_data = []
-
 
 
 #====== QT area ======
@@ -32,8 +42,10 @@ class IMU_GUI(QWidget):
         self.createConnection()
 
         # window properties adjustment
-        self.resize(300,400)
-        self.move(0,35)
+        self.setGeometry(140,70,300,400)
+        #self.resize(300,400)
+        #self.move(140,35)
+        self.setWindowIcon(QIcon('/home/pi/Self_IMU/icon/QIMU.png'))
         self.setWindowTitle("MPU9250 & PiCamera GUI")
 
         # varibles
@@ -43,20 +55,26 @@ class IMU_GUI(QWidget):
 
         self.photo_count = 0
         self.video_count = 0
-        self.now = datetime.datetime.now()
+
+
+        self.path = "%s_%s" % (today, tonow)
+        if not os.path.exists(self.path):
+            try:
+                os.makedirs(self.path)
+            except OSError:
+                if not os.path.isdir(self.path):
+                    raise
+
+
 
     def createLayout(self):
-        self.camBrowser  = QTextBrowser()
-        h4 = QHBoxLayout()
-        h4.addWidget(self.camBrowser)
 
-        self.previewButton = QPushButton("Preview")
-        self.filmButton = QPushButton("Filming")
-        self.photoButton = QPushButton("Photo Take")
-        h5 = QHBoxLayout()
-        h5.addWidget(self.previewButton)
-        h5.addWidget(self.filmButton)
-        h5.addWidget(self.photoButton)
+        #===== IMU Layout =====
+        self.IMU_Label = QLabel("@ IMU Area @")
+        self.stableCheckBox = QCheckBox(u"即時慢速寫入")
+        h0=QHBoxLayout()
+        h0.addWidget(self.IMU_Label)
+        h0.addWidget(self.stableCheckBox)
 
 
         self.statusBrowser  = QTextBrowser()
@@ -72,16 +90,36 @@ class IMU_GUI(QWidget):
         h2.addWidget(self.saveButton)
 
 
+        #===== PiCamera layout ======
+        self.PiCamera_Label = QLabel("@ PiCamera Area @")
+        h3=QHBoxLayout()
+        h3.addWidget(self.PiCamera_Label)
 
+        self.camBrowser  = QTextBrowser()
+        h4 = QHBoxLayout()
+        h4.addWidget(self.camBrowser)
+
+        self.previewButton = QPushButton("Preview")
+        self.filmButton = QPushButton("Filming")
+        self.photoButton = QPushButton("Photo Take")
+        h5 = QHBoxLayout()
+        h5.addWidget(self.previewButton)
+        h5.addWidget(self.filmButton)
+        h5.addWidget(self.photoButton)
+
+        # setting layout
         layout1 = QVBoxLayout()
         layout2 = QVBoxLayout()
         layout0 = QVBoxLayout()
 
 
+        # IMU Layout
+        layout1.addLayout(h0)
         layout1.addLayout(h1)
         layout1.addLayout(h2)
 
-
+        # PiCamera Layout
+        layout2.addLayout(h3)
         layout2.addLayout(h4)
         layout2.addLayout(h5)
 
@@ -110,16 +148,23 @@ class IMU_GUI(QWidget):
         self.saveButton.clicked.connect(self.save)
         self.connect(self.save_record, SIGNAL("finished()"), self.finished)
 
+        #====== Stable CheckBox related =====
+        self.stableCheckBox.stateChanged.connect(self.enable_stable)
 
     #===== IMU Func. area =====
     def start(self):
-        # IMU initial
+
+        test_t0 = time.time()
         self.statusBrowser.append("IMU Initializing...")
 
+        #===== IMU initial =====
         try:
-            i2c.write_byte_data(0x68, 0x6a, 0x00)
-            i2c.write_byte_data(0x68, 0x37, 0x02)
-            i2c.write_byte_data(0x0c, 0x0a, 0x16)
+            for i in range(2):
+                i2c.write_byte_data(0x68, 0x6a, 0x00)
+                i2c.write_byte_data(0x68, 0x37, 0x02)
+                i2c.write_byte_data(0x0c, 0x0a, 0x16)
+                time.sleep(0.01)
+
             self.statusBrowser.append("Initialization Done!")
             self.IMU_KEY = True
 
@@ -130,18 +175,21 @@ class IMU_GUI(QWidget):
             self.startButton.setEnabled(True)
             self.stopButton.setEnabled(False)
             self.saveButton.setEnabled(False)
-            #===== end initial ======
+        #===== end initial ======
 
-        if self.IMU_KEY:
+
+        if self.IMU_KEY and not self.stableCheckBox.isChecked():
             self.tt0 = time.time()
             self.statusBrowser.append("Start Recording....")
-            self.imu_start_record.start()
+
             self.startButton.setEnabled(False)
             self.stopButton.setEnabled(True)
             self.saveButton.setEnabled(False)
-        else:
-            pass
 
+            self.imu_start_record.start()
+
+        elif self.IMU_KEY and self.stableCheckBox.isChecked():
+            pass
 
     def stop(self):
         global raw_data
@@ -155,20 +203,41 @@ class IMU_GUI(QWidget):
         self.stopButton.setEnabled(False)
         self.saveButton.setEnabled(True)
 
+
     def save(self):
         self.statusBrowser.append("Data saving....")
-        time.sleep(1)
+        time.sleep(0.5)
         self.save_record.start()
         self.startButton.setEnabled(False)
         self.stopButton.setEnabled(False)
         self.saveButton.setEnabled(False)
 
     def finished(self):     # will be call when save_record was finished
-        self.statusBrowser.append("Data saved, List and Port clear.")
-        self.statusBrowser.append("===== End Section=====")
+        self.statusBrowser.append("Data saved, memory clear.")
+        self.statusBrowser.append("===== End Section =====")
         self.saveButton.setEnabled(False)
         self.stopButton.setEnabled(False)
         self.startButton.setEnabled(True)
+
+    def stable_start(self):
+        pass
+
+    def stable_stop(self):
+        pass
+
+    def enable_stable(self):
+        check_stable = QMessageBox.question(self, u'啟動即時寫入', \
+                                            u"即時寫入將大幅延遲每筆資料速度，並保證資料即時記錄於檔案中，確定嗎？\n    按'Yes'啟動即時檔案寫入，\n    按'NO'取消即時檔案寫入", \
+                                            QMessageBox.Yes | QMessageBox.No)
+
+        if check_stable == QMessageBox.Yes:
+            self.statusBrowser.append(u"*IMU即時寫入已啟動")
+            self.stableCheckBox.setCheckState(2)
+            self.saveButton.setEnabled(False)
+        else:
+            self.statusBrowser.append(u"*取消即時寫入")
+            self.stableCheckBox.setCheckState(0)
+            self.saveButton.setEnabled(True)
 
 
     #===== Picamera Func. area =====
@@ -176,7 +245,7 @@ class IMU_GUI(QWidget):
         camera.stop_preview()
         if not self.preview_switch:
             self.camBrowser.append("Preview on.")
-            camera.start_preview(fullscreen = False, window = (400, 10, 400, 300) )
+            camera.start_preview(fullscreen = False, window = (450, 10, 400, 300) )
             self.preview_switch = True
         elif self.preview_switch:
             self.camBrowser.append("Preview off.")
@@ -191,7 +260,7 @@ class IMU_GUI(QWidget):
         if not self.film_switch:
             self.camBrowser.append("Start Filming...")
             self.video_count += 1
-            camera.start_recording('video_%2d.h264' %self.video_count)
+            camera.start_recording('video%d.h264' %(self.video_count) )
             self.film_switch = True
             self.photoButton.setEnabled(False)
 
@@ -205,14 +274,13 @@ class IMU_GUI(QWidget):
         else:
             self.camBrowser.append("Film Booom!")
 
-
     def take_photo(self):
         self.photo_count += 1
         self.filmButton.setEnabled(False)
         self.photoButton.setEnabled(False)
 
         # Create "Photo" folder if not exist
-        photo_path = "photo"
+        photo_path = self.path
         if not os.path.exists(photo_path):
             try:
                 os.makedirs(photo_path)
@@ -221,12 +289,12 @@ class IMU_GUI(QWidget):
                     raise
 
 
-        camera.capture(photo_path + '/image_%2d.jpg' %self.photo_count)
-        self.camBrowser.append("image_%2d saved" %self.photo_count)
-        time.sleep(0.3)
+        camera.capture(photo_path + '/image%d.jpg' %self.photo_count )
+        self.camBrowser.append("image%d saved" %self.photo_count )
 
         self.photoButton.setEnabled(True)
         self.filmButton.setEnabled(True)
+
 
 class imu_start_record(QThread):
     def  __init__(self, parent=None):
@@ -238,8 +306,9 @@ class imu_start_record(QThread):
         global raw_data
 
         # varibles
-        self.t_a_g = []
+
         self.t0 = time.time()
+        self.t_a_g = []
 
         with QMutexLocker(self.mutex):
             self.stoped = False
@@ -248,10 +317,12 @@ class imu_start_record(QThread):
             if not self.stoped:
                 self.mpu9250_data_get_and_write()
             else:
+                #print("break!")
                 break
 
-        raw_data = list(self.t_a_g)
 
+        raw_data = list(self.t_a_g)
+        #print "data copy!"
 
     def stop(self):
         with QMutexLocker(self.mutex):
@@ -287,6 +358,7 @@ class imu_start_record(QThread):
         self.t_a_g.append(xyz_mag)
         #t_a_g.append(xyz_mag_adj)
 
+        time.sleep(0.00001)
 
 class save_record(QThread):
     def  __init__(self, parent=None):
@@ -298,7 +370,8 @@ class save_record(QThread):
         self.imu_count += 1
 
         try:
-            self.data_f = open("IMU_LOG_" + str(self.imu_count) + ".txt", "w")
+            filename = "IMU_LOG_%s.txt" %(self.imu_count)
+            self.data_f = open(filename, "w")
             for i in raw_data:
                 if isinstance(i, float):
                     print >> self.data_f ,"%f" %i
@@ -311,6 +384,7 @@ class save_record(QThread):
             i2c.write_byte_data(addr, 0x6A, 0x07)
             raw_data = []
             self.data_f.close()
+
 
 
 if __name__ == "__main__":
