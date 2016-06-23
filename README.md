@@ -31,8 +31,7 @@ HOW IT LOOKS LIKE:
 1. IMU_GUI
 
 2. Decode_GUI
-![Alt Overview](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/Decode_GUI.png)
-
-
+![Alt DecodeGUI](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/Decode_GUI.png)
+![Alt PLOTGXGY](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/Decode_GUI_PLOT.png)
 
 
