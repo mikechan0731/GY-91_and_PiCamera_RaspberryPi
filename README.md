@@ -1,9 +1,8 @@
 # GY-91_and_PiCamera_RaspberryPi
-![Alt tag](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/QIMU.png )
 Recording target item's IMU Informations(9-axis) and Take a photo or film through PiCamera with RaspberryPI!!
 
-HOW IT LOOKS LIKE: -below-
-![Alt text](relative/path/to/img.jpg?raw=true "QIMU")
+HOW IT LOOKS LIKE:
+![Alt Overview](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/overview.png)
 
 #WHEN TO USE:
 1. You have a GY-91 and can't find a good introduction to use.
@@ -29,6 +28,10 @@ HOW IT LOOKS LIKE: -below-
 !!Wiring Diagram: -below-
 
 #RESULT:
+1. IMU_GUI
+
+2. Decode_GUI
+![Alt Overview](https://raw.githubusercontent.com/mikechan0731/GY-91_and_PiCamera_RaspberryPi/master/img/Decode_GUI.png)
 
 
 
