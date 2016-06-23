@@ -2,8 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Author : MikeChan
 # Email  : m7807031@gmail.com
-# Date   : 06/14/2016
-
+# Date   : 06/21/2016
 
 import time, sys, os, datetime, threading
 from PyQt4.QtCore import *
@@ -20,14 +19,14 @@ tonow = str( str(now).split(" ")[1].split(":")[0] + str(now).split(" ")[1].split
 import smbus
 import picamera
 i2c = smbus.SMBus(1)
-
 #enable pi-camera
 try:
     camera = picamera.PiCamera()
 except:
-    self.camBrowser.append("PiCamera Initial Failed")
+    pass
 addr = 0x68
 raw_data = []
+
 
 
 #====== QT area ======
@@ -35,6 +34,7 @@ class IMU_GUI(QWidget):
     def __init__(self, parent = None):
         super(IMU_GUI, self).__init__(parent)
         self.imu_start_record = imu_start_record()
+        self.imu_start_record_stable = imu_start_record_stable()
         self.save_record = save_record()
 
         # create Layout and connection
@@ -189,22 +189,38 @@ class IMU_GUI(QWidget):
             self.imu_start_record.start()
 
         elif self.IMU_KEY and self.stableCheckBox.isChecked():
-            pass
+            self.tt0 = time.time()
+            self.statusBrowser.append("Start Recording in Stable Status...")
+
+            self.startButton.setEnabled(False)
+            self.stopButton.setEnabled(True)
+            self.saveButton.setEnabled(False)
+
+            self.imu_start_record_stable.start()
 
     def stop(self):
         global raw_data
 
         self.duringTime = time.time() - self.tt0
-        self.imu_start_record.stop()
         self.statusBrowser.append("Record Stop!")
         self.statusBrowser.append("During Time: " + "%.2f" %self.duringTime)
 
-        self.startButton.setEnabled(True)
-        self.stopButton.setEnabled(False)
-        self.saveButton.setEnabled(True)
+        if not self.stableCheckBox.isChecked():
+            self.imu_start_record.stop()
+            self.startButton.setEnabled(True)
+            self.stopButton.setEnabled(False)
+            self.saveButton.setEnabled(True)
+
+        elif self.stableCheckBox.isChecked():
+            self.imu_start_record_stable.stop()
+            self.startButton.setEnabled(True)
+            self.stopButton.setEnabled(False)
+            self.saveButton.setEnabled(False)
+            self.statusBrowser.append("== Data Saved and Port Clear ==")
 
 
     def save(self):
+
         self.statusBrowser.append("Data saving....")
         time.sleep(0.5)
         self.save_record.start()
@@ -219,15 +235,10 @@ class IMU_GUI(QWidget):
         self.stopButton.setEnabled(False)
         self.startButton.setEnabled(True)
 
-    def stable_start(self):
-        pass
-
-    def stable_stop(self):
-        pass
 
     def enable_stable(self):
         check_stable = QMessageBox.question(self, u'啟動即時寫入', \
-                                            u"即時寫入將大幅延遲每筆資料速度，並保證資料即時記錄於檔案中，確定嗎？\n    按'Yes'啟動即時檔案寫入，\n    按'NO'取消即時檔案寫入", \
+                                            u"此選項將延遲每筆資料速度，並保證資料即時記錄於檔案中，確定嗎？\n    按'Yes'啟動即時檔案寫入，\n    按'NO'取消即時檔案寫入", \
                                             QMessageBox.Yes | QMessageBox.No)
 
         if check_stable == QMessageBox.Yes:
@@ -257,10 +268,19 @@ class IMU_GUI(QWidget):
 
     def film(self):
         #camera.stop_recording()
+        film_path = self.path
+        if not os.path.exists(film_path):
+            try:
+                os.makedirs(film_path)
+            except OSError:
+                if not os.path.isdir(film_path):
+                    raise
+
+
         if not self.film_switch:
             self.camBrowser.append("Start Filming...")
             self.video_count += 1
-            camera.start_recording('video%d.h264' %(self.video_count) )
+            camera.start_recording(film_path + '/video%d.h264' %(self.video_count) )
             self.film_switch = True
             self.photoButton.setEnabled(False)
 
@@ -294,6 +314,7 @@ class IMU_GUI(QWidget):
 
         self.photoButton.setEnabled(True)
         self.filmButton.setEnabled(True)
+
 
 
 class imu_start_record(QThread):
@@ -359,6 +380,80 @@ class imu_start_record(QThread):
         #t_a_g.append(xyz_mag_adj)
 
         time.sleep(0.00001)
+
+
+
+class imu_start_record_stable(QThread):
+    def  __init__(self, parent=None):
+        super(self.__class__, self).__init__(parent)
+        self.stoped = False
+        self.mutex = QMutex()
+        self.imu_count_stable = 0
+
+
+    def run(self):
+        self.t0 = time.time()
+        self.imu_count_stable += 1
+
+        with QMutexLocker(self.mutex):
+            self.stoped = False
+
+        while 1:
+            if not self.stoped:
+                self.mpu9250_data_get_and_write()
+            else:
+                break
+
+
+
+    def stop(self):
+        with QMutexLocker(self.mutex):
+            self.stoped = True
+
+    def isStop(self):
+        with QMutexLocker(self.mutex):
+            return self.stoped
+
+
+    def mpu9250_data_get_and_write(self):
+
+        # keep AKM pointer on continue measuring
+        i2c.write_byte_data(0x0c, 0x0a, 0x16)
+
+        # get MPU9250 smbus block data
+        #xyz_g_offset = i2c.read_i2c_block_data(addr, 0x13, 6)
+        xyz_a_out = i2c.read_i2c_block_data(addr, 0x3B, 6)
+        xyz_g_out = i2c.read_i2c_block_data(addr, 0x43, 6)
+        #xyz_a_offset = i2c.read_i2c_block_data(addr, 0x77, 6)
+
+        # get AK8963 smbus data (by pass-through way)
+        xyz_mag  = i2c.read_i2c_block_data(0x0c, 0x03, 6)
+        #xyz_mag_adj = i2c.read_i2c_block_data(0x0c, 0x10, 3)
+
+        # get real time
+        t1 = time.time() - self.t0
+
+        # save file to list buffer
+        #self.t_a_g.append(t1)
+        #self.t_a_g.append(xyz_a_out)
+        #self.t_a_g.append(xyz_g_out)
+        #self.t_a_g.append(xyz_mag)
+        #t_a_g.append(xyz_mag_adj)
+
+
+        filename = "IMU_LOG_Stable_%s.txt" %(self.imu_count_stable)
+
+        file_s = open(filename, "a")
+
+        print >> file_s, "%f" %t1
+        print >> file_s, xyz_a_out
+        print >> file_s, xyz_g_out
+        print >> file_s, xyz_mag
+
+        file_s.close()
+        time.sleep(0.00001)
+
+
 
 class save_record(QThread):
     def  __init__(self, parent=None):
