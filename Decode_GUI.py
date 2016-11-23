@@ -7,6 +7,7 @@
 import time, sys, os, datetime, threading
 import numpy as np
 import matplotlib.pyplot as plt
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
@@ -16,7 +17,6 @@ class Decode_GUI(QWidget):
         super(Decode_GUI, self).__init__(parent)
 
         self.INHERIT_KEY = False
-
 
         # create Layout and connection
         self.createLayout()
@@ -43,7 +43,6 @@ class Decode_GUI(QWidget):
         self.parseAll_button = QPushButton(u"解算 時間+9軸 資訊")
         h3 = QHBoxLayout()
         h3.addWidget(self.parseAll_button)
-
 
 
         self.parseTime_button = QPushButton(u"分離 時間 資訊")
@@ -90,7 +89,7 @@ class Decode_GUI(QWidget):
         h6_iii.addWidget(self.gy_plot_check)
         h6_iii.addWidget(self.gz_plot_check)
 
-        self.optionLabel_mag = QLabel(u"三軸磁力計(  1.6 LSB/uT )：")
+        self.optionLabel_mag = QLabel(u"三軸磁力計( 1.6 LSB/uT )：")
         self.mx_plot_check=QCheckBox("mx")
         self.my_plot_check=QCheckBox("my")
         self.mz_plot_check=QCheckBox("mz")
@@ -141,12 +140,18 @@ class Decode_GUI(QWidget):
 
         # Choose file
         s = QFileDialog.getOpenFileName(self,u"開啟IMU檔案","/","Text files(*.txt)")
-        self.fileLineEdit.setText(u'%s' %s)
+
+        self.fileLineEdit.setText(s)
+
+        #self.statusBrowser.append(u"檔案已選擇。")
+        #time.sleep(0.5)
+
+
         if len(self.fileLineEdit.text()) > 2:
             f = open(u'%s' %s,'r')
             first_line = f.readline().rstrip().split("\t")
 
-            if type(first_line) == list and len(first_line) == 10:
+            if type(first_line) == list and (len(first_line) == 10 or len(first_line)==7):
                 self.statusBrowser.append(u"解析過檔案已選擇。")
                 self.parseAll_button.setEnabled(False)
                 self.parseTime_button.setEnabled(True)
@@ -168,6 +173,7 @@ class Decode_GUI(QWidget):
                 self.toPlot_button.setEnabled(False)
 
             f.close()
+
         else:
             self.statusBrowser.append(u"請重新選擇檔案。")
 
@@ -184,25 +190,34 @@ class Decode_GUI(QWidget):
             return j
 
         def dec_2_hexdec(lst, MLSB="MSB"):
-            def signed_check(num):
+
+            def signed_check_MPU(num):
                 if num > 32767:
                     num -= 65536
                 return num
+            def signed_check_AKM(num):
+                if num > 32760:
+                    num -= 65520
+                return num
 
             three_num = []
+
             if MLSB =="MSB":
                 a = lst[0]*256 + lst[1]*1
                 b = lst[2]*256 + lst[3]*1
                 c = lst[4]*256 + lst[5]*1
 
+                three_num.append(signed_check_MPU(a))
+                three_num.append(signed_check_MPU(b))
+                three_num.append(signed_check_MPU(c))
+
             elif MLSB =="LSB":
                 a = lst[1]*256 + lst[0]*1
                 b = lst[3]*256 + lst[2]*1
                 c = lst[5]*256 + lst[4]*1
-
-            three_num.append(signed_check(a))
-            three_num.append(signed_check(b))
-            three_num.append(signed_check(c))
+                three_num.append(signed_check_AKM(a))
+                three_num.append(signed_check_AKM(b))
+                three_num.append(signed_check_AKM(c))
 
             return three_num
 
@@ -211,28 +226,44 @@ class Decode_GUI(QWidget):
 
         f = open(u"%s" %s ,"r")
         w = open(u"%s_RESULT.txt" %s1, "w")
-
+        w.close()
 
         data_line_list = []
 
         # save stripped data in list
-        for data_line in f.readlines():
+        tick = 0
+        one_line_result = ""
+
+
+        for line in open(u"%s" %s ,"r"):
+            data_line= f.readline()
             data_line_strip = data_line.strip()
-            data_line_list.append(data_line_strip)
+            #data_line_list.append(data_line_strip)
 
+            if tick == 0:
+                result_list = data_line_strip
+                one_line_result += result_list + "\t"
+                tick += 1
+            elif tick == 1:
+                result_list = dec_2_hexdec(eval(data_line_strip))
+                one_line_result += list_sep(result_list)
+                tick += 1
+            elif tick == 2:
+                result_list = dec_2_hexdec(eval(data_line_strip))
+                one_line_result += list_sep(result_list)
+                tick += 1
+            elif tick == 3:
+                result_list = dec_2_hexdec(eval(data_line_strip), "LSB")
+                one_line_result += list_sep(result_list)
+                one_line_result
 
-        for i in range(len(data_line_list)):
-            if i % 4 == 0:
+                w = open(u"%s_RESULT.txt" %s1, "a+")
+                print >> w, one_line_result
+                w.close()
 
-                axyz_list     = dec_2_hexdec(eval(data_line_list[i+1]))
-                gxyz_list     = dec_2_hexdec(eval(data_line_list[i+2]))
-                magxyz_list   = dec_2_hexdec(eval(data_line_list[i+3]), "LSB")
-                count += 1
-
-                #time + accer + gyro + mag
-                print >> w, data_line_list[i]  + "\t" + list_sep(axyz_list)  + list_sep(gxyz_list)  +  list_sep(magxyz_list)
-
-
+                one_line_result=""
+                tick = 0
+                count +=1
 
         f.close()
         w.close()
@@ -251,13 +282,26 @@ class Decode_GUI(QWidget):
     def parseTime(self):
         t0 = time.time()
         self.statusBrowser.append(u"分離資料時間...")
+        time_data_list = []
 
-        time_data = []
         if self.INHERIT_KEY == False:
             s = self.fileLineEdit.text()
             f = open(u"%s" %s ,"r")
             s1 = s[:-4]
+
             w = open(u"%s_TIME.txt" %s1, "w")
+            w.close()
+
+            data_line_strip = []
+
+            for line in open(u"%s" %s ,"r"):
+                data_line= f.readline()
+                data_line_strip = data_line.strip().split("\t")
+                time_data = data_line_strip[0]
+
+                w = open(u"%s_TIME.txt" %s1, "a+")
+                print >> w, time_data
+                w.close()
 
         elif self.INHERIT_KEY == True:
             s = self.fileLineEdit.text()
@@ -265,16 +309,20 @@ class Decode_GUI(QWidget):
 
             f = open(u"%s_RESULT.txt" %s1 ,"r")
             w = open(u"%s_RESULT_TIME.txt" %s1, "w")
+            w.close()
+
+            for line in open(u"%s_RESULT.txt" %s1 ,"r"):
+                data_line= f.readline()
+                data_line_strip = data_line.strip().split("\t")
+                time_data = data_line_strip[0]
+
+                w = open(u"%s_RESULT_TIME.txt" %s1, "a+")
+                print >> w, time_data
+                w.close()
+
         else:
             print "ERROR OCCUR!"
 
-
-        for i in f.readlines():
-            j = i.strip().split("\t")
-            time_data.append(float(j[0]))
-
-        for i in time_data:
-            print >> w, i
 
         f.close()
         w.close()
@@ -283,127 +331,75 @@ class Decode_GUI(QWidget):
         self.statusBrowser.append(u"時間資訊分離完成，共花費%.2f秒" %t1)
         self.toPlot_button.setEnabled(True)
 
+
     def parseTimeDiff(self):
         t0 = time.time()
         self.statusBrowser.append(u"解算資料時間差...")
 
-        time_data = []
-
         if self.INHERIT_KEY == False:
             s = self.fileLineEdit.text()
             s1 = s[:-4]
-            f = open(u"%s" %s ,"r")
             w = open(u"%s_TIMEDIFF.txt" %s1, "w")
-        elif self.INHERIT_KEY ==True:
+            w.close()
+            before_value = 0.0
+            with open(u"%s" %s ,"r") as f:
+                for line in f:
+                        cc = float(line.strip().split("\t")[0]) - before_value
+                        before_value = float(line.strip().split("\t")[0])
+                        w = open(u"%s_TIMEDIFF.txt" %s1, "a+")
+                        print >> w, cc
+                        w.close()
+
+
+        elif self.INHERIT_KEY == True:
             s = self.fileLineEdit.text()
             s1 = s[:-4]
-            f = open(u"%s_RESULT.txt" %s1 ,"r")
+
             w = open(u"%s_RESULT_TIMEDIFF.txt" %s1, "w")
-
-        for i in f.readlines():
-            j = i.strip().split("\t")
-            time_data.append(float(j[0]))
-
-        time_array = np.array(time_data)
-        #print time_array.size
-        #print type(time_array[0])
-
-        time_diff_array = np.diff(time_array)
-        #print time_diff_array.size
-
-
-        mean_td = time_diff_array.mean()
-        std_td = time_diff_array.std()
-        max_td = np.amax(time_diff_array)
-        min_td = np.amin(time_diff_array)
-
-        data_analyst = "mean\t%f\nstd\t%f\nmax\t%f\nmin\t%f" %(mean_td, std_td, max_td, min_td)
-
-        print >> w, "%s" %data_analyst
-
-        for i in time_diff_array:
-            print >> w, "%.6f" %i
-
-        f.close()
-        w.close()
+            w.close()
+            before_value = 0.0
+            with open(u"%s_RESULT.txt" %s1 ,"r") as f:
+                for line in f:
+                    cc = float(line.strip().split("\t")[0]) - before_value
+                    before_value = float(line.strip().split("\t")[0])
+                    w = open(u"%s_RESULT_TIMEDIFF.txt" %s1, "a+")
+                    print >> w, cc
+                    w.close()
 
         t1 = time.time()-t0
 
         self.statusBrowser.append(u"時間差資料分離完成，共花費%.2f秒" %t1)
-        self.statusBrowser.append(u"時間差統計數據如下:")
-        self.statusBrowser.append(u"共 %d 筆資料。" % time_diff_array.size)
-        self.statusBrowser.append(u"平均值:%f    標準差:%f" %(mean_td, std_td) )
-        self.statusBrowser.append(u"最大值:%f    最小值:%f" %(max_td, min_td)  )
-        self.statusBrowser.append(u"========================")
-
         self.toPlot_button.setEnabled(True)
 
-    def toPlot(self):
 
-        # open right file ex. IMU_LOG_RESULT
+    def toPlot(self):
         if self.INHERIT_KEY == False:
             s = self.fileLineEdit.text()
+            fname=u"%s" %s
             f = open(u"%s" %s ,"r")
 
         elif self.INHERIT_KEY ==True:
             s = self.fileLineEdit.text()
             s1 = s[:-4]
+            fname = u"%s_RESULT.txt" %s1
             f = open(u"%s_RESULT.txt" %s1 ,"r")
 
-        # asign value to varibles
-        time=[]
-        ax=[]
-        ay=[]
-        az=[]
-        gx=[]
-        gy=[]
-        gz=[]
-        mx=[]
-        my=[]
-        mz=[]
+        datatype=[('time',np.float32), ('ax',np.int16), ('ay',np.int16), ('az',np.int16),
+                                            ('gx',np.int16), ('gy',np.int16), ('gz',np.int16),
+                                            ('mx',np.int16), ('my',np.int16), ('mz',np.int16),
+                                            ('time_diff', np.float32)]
 
+        data = np.genfromtxt(fname, dtype=datatype, delimiter="\t")
 
-        for i in f.readlines():
-            j = i.strip().split("\t")
-            time.append(float(j[0]))
-            ax.append(float(j[1]))
-            ay.append(float(j[2]))
-            az.append(float(j[3]))
-            gx.append(float(j[4]))
-            gy.append(float(j[5]))
-            gz.append(float(j[6]))
-            mx.append(float(j[7]))
-            my.append(float(j[8]))
-            mz.append(float(j[9]))
+        time_diff_array = np.diff(data['time'])
+        time_diff_array = np.append(time_diff_array, [time_diff_array[-1]])
 
-        self.time_array = np.array(time)
-        self.time_diff_array = np.diff(self.time_array)
-        self.ax_array = np.array(ax)
-        self.ay_array = np.array(ay)
-        self.az_array = np.array(az)
-        self.gx_array = np.array(gx)
-        self.gy_array = np.array(gy)
-        self.gz_array = np.array(gz)
-        self.mx_array = np.array(mx)
-        self.my_array = np.array(my)
-        self.mz_array = np.array(mz)
+        data['time_diff'] = time_diff_array
 
-
-
-        #===== Plot Area =====
-        #plt.plot(count_array, self.time_diff_array)
-
-        value_list = [  self.time_array,
-                        self.time_diff_array,
-                        self.ax_array,
-                        self.ay_array,
-                        self.az_array,
-                        self.gx_array,
-                        self.gy_array,
-                        self.gz_array,
-                        self.mx_array,
-                        self.my_array,
-                        self.mz_array]
+        data_index = [ 'time', 'time_diff',
+                        'ax', 'ay', 'az',
+                        'gx', 'gy', 'gz',
+                        'mx', 'my', 'mz']
 
         checkbox_list = [   self.time_plot_check,
                             self.timediff_plot_check,
@@ -417,30 +413,14 @@ class Decode_GUI(QWidget):
                             self.my_plot_check,
                             self.mz_plot_check]
 
-        line_label = [  "time",
-                        "time_diff",
-                        "ax",
-                        "ay",
-                        "az",
-                        "gx",
-                        "gy",
-                        "gz",
-                        "mx",
-                        "my",
-                        "mz"]
-
-        result = ""
-
         for i in range(len(checkbox_list)):
             if checkbox_list[i].isChecked():
-                plt.plot(np.arange(0,value_list[i].size), value_list[i], label=line_label[i])
-
-
-            else:
-                pass
+                plt.plot(np.arange(0,data[data_index[i]].size),data[data_index[i]], label=data_index[i])
+                self.statusBrowser.append(str(np.average(data[data_index[i]])))
+                #print "check checked"
 
         plt.legend(loc='upper left')
-        plt.title(result)
+        plt.title('result')
 
         plt.show()
 
