@@ -17,13 +17,13 @@ HOW IT LOOKS LIKE:
 
 !!Module Using:
 1.Python2
-  -PYQT4
-  -numpy
-  -matplotlib
+  a. PYQT4
+  b. numpy
+  c. matplotlib
 
 2.hardware
-  -smbus
-  -picamera
+  a. smbus
+  b. picamera
   
 !!Wiring Diagram: -below-
 
