@@ -532,4 +532,3 @@ if __name__ == "__main__":
 	IMU_GUI = IMU_GUI()
 	IMU_GUI.show()
 	sys.exit(app.exec_())
-
