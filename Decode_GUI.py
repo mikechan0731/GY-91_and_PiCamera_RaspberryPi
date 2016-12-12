@@ -18,6 +18,10 @@ class Decode_GUI(QWidget):
 
         self.INHERIT_KEY = False
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> fd9988560bbd6a0c888dc87011c6b7fc72041855
         # create Layout and connection
         self.createLayout()
         self.createConnection()
@@ -45,6 +49,10 @@ class Decode_GUI(QWidget):
         h3.addWidget(self.parseAll_button)
 
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> fd9988560bbd6a0c888dc87011c6b7fc72041855
         self.parseTime_button = QPushButton(u"分離 時間 資訊")
         self.parseTimeDiff_button = QPushButton(u"分離 時間差 資訊")
         h4 = QHBoxLayout()
@@ -89,7 +97,11 @@ class Decode_GUI(QWidget):
         h6_iii.addWidget(self.gy_plot_check)
         h6_iii.addWidget(self.gz_plot_check)
 
+<<<<<<< HEAD
+        self.optionLabel_mag = QLabel(u"三軸磁力計(  1.6 LSB/uT )：")
+=======
         self.optionLabel_mag = QLabel(u"三軸磁力計( 1.6 LSB/uT )：")
+>>>>>>> fd9988560bbd6a0c888dc87011c6b7fc72041855
         self.mx_plot_check=QCheckBox("mx")
         self.my_plot_check=QCheckBox("my")
         self.mz_plot_check=QCheckBox("mz")
@@ -140,6 +152,9 @@ class Decode_GUI(QWidget):
 
         # Choose file
         s = QFileDialog.getOpenFileName(self,u"開啟IMU檔案","/","Text files(*.txt)")
+<<<<<<< HEAD
+        self.fileLineEdit.setText(u'%s' %s)
+=======
 
         self.fileLineEdit.setText(s)
 
@@ -147,6 +162,7 @@ class Decode_GUI(QWidget):
         #time.sleep(0.5)
 
 
+>>>>>>> fd9988560bbd6a0c888dc87011c6b7fc72041855
         if len(self.fileLineEdit.text()) > 2:
             f = open(u'%s' %s,'r')
             first_line = f.readline().rstrip().split("\t")
@@ -173,7 +189,10 @@ class Decode_GUI(QWidget):
                 self.toPlot_button.setEnabled(False)
 
             f.close()
+<<<<<<< HEAD
+=======
 
+>>>>>>> fd9988560bbd6a0c888dc87011c6b7fc72041855
         else:
             self.statusBrowser.append(u"請重新選擇檔案。")
 
